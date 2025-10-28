@@ -34,7 +34,7 @@ const AdminDashboard = () => {
   // Fetch users
   useEffect(() => {
     setLoading(true);
-    axios.get('http://localhost:8080/admin/users')
+    axios.get('https://maliyah-server.onrender.com/admin/users')
       .then(res => { setUsers(res.data); setLoading(false); })
       .catch(err => { console.error(err); setLoading(false); });
   }, []);
@@ -43,7 +43,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (activeTab === 'categories') {
       setLoading(true);
-      axios.get(`http://localhost:8080/categories/${adminEmail}`)
+      axios.get(`https://maliyah-server.onrender.com/categories/${adminEmail}`)
         .then(res => { setCategories(res.data); setLoading(false); })
         .catch(err => { console.error(err); setLoading(false); });
     }
@@ -53,7 +53,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (activeTab === 'feedback') {
       setLoading(true);
-      axios.get('http://localhost:8080/feedback')
+      axios.get('https://maliyah-server.onrender.com/feedback')
         .then(res => { setFeedbacks(res.data); setLoading(false); })
         .catch(err => { console.error(err); setLoading(false); });
     }
@@ -103,7 +103,7 @@ const AdminDashboard = () => {
     }
  
     try {
-      const res = await axios.post('http://localhost:8080/categories', {
+      const res = await axios.post('https://maliyah-server.onrender.com/categories', {
         name: newCategory.name,
         type: newCategory.type,
         description: newCategory.description,
@@ -148,7 +148,7 @@ const AdminDashboard = () => {
     }
  
     try {
-      const res = await axios.put(`http://localhost:8080/categories/${editCategory._id}`, {
+      const res = await axios.put(`https://maliyah-server.onrender.com/categories/${editCategory._id}`, {
         name: editCategory.name,
         type: editCategory.type,
         description: editCategory.description
@@ -166,7 +166,7 @@ const AdminDashboard = () => {
   // Delete category
   const deleteCategory = async (id) => {
     try {
-      await axios.delete(`http://localhost:8080/categories/${id}`);
+      await axios.delete(`https://maliyah-server.onrender.com/categories/${id}`);
       setCategories(categories.filter(cat => cat._id !== id));
       setSuccessMessage('Category deleted successfully!');
       setShowSuccess(true);
@@ -368,3 +368,4 @@ const AdminDashboard = () => {
 export default AdminDashboard;
  
  
+
