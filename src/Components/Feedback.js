@@ -32,7 +32,7 @@ const UserFeedback = () => {
     setErrorMessage("");
 
     try {
-      await axios.post("http://localhost:8080/feedback", {
+      await axios.post("https://maliyah-server.onrender.com/feedback", {
         userEmail,
         rating,
         comment
@@ -155,3 +155,4 @@ const UserFeedback = () => {
 };
 
 export default UserFeedback;
+
