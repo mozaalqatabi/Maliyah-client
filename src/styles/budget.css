@@ -1,0 +1,25 @@
+.tutorial-center {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@keyframes float-soft {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
+}
+.float-soft { animation: float-soft 5s ease-in-out infinite; }
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(25,135,84,.4); }
+  70% { box-shadow: 0 0 0 12px rgba(25,135,84,0); }
+  100% { box-shadow: 0 0 0 0 rgba(25,135,84,0); }
+}
+.pulse-ring { animation: pulse-ring 1.8s ease-out infinite; border-radius: 12px; }
+
+@keyframes bounce-h {
+  0%,100% { transform: translateX(0); opacity: .6; }
+  50% { transform: translateX(6px); opacity: 1; }
+}
+.bounce-h { animation: bounce-h 1.4s ease-in-out infinite; }

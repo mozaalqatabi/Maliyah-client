@@ -1,0 +1,140 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Register Component Tests matches the UI snapshot 1`] = `
+<div>
+  <div
+    style="background-color: rgb(166, 189, 255); min-height: 100vh; display: flex; justify-content: center; align-items: center;"
+  >
+    <a
+      href="/"
+      style="position: absolute; top: 50px; left: 100px; color: rgb(79, 107, 237); text-decoration: none; font-weight: 500; font-size: 0.95rem;"
+    >
+      ← Back to Home Page
+    </a>
+    <div
+      style="width: 100%; max-width: 420px; background-color: white; padding: 30px; border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.1);"
+    >
+      <div
+        class="text-center mb-4"
+      >
+        <h4
+          class="mt-3 mb-1"
+        >
+          Create your Maliyah Account
+        </h4>
+        <p
+          style="font-size: 0.9rem; color: rgb(102, 102, 102);"
+        >
+          Fill in your details to get started
+        </p>
+      </div>
+      <form>
+        <div
+          class="mb-3"
+        >
+          <label
+            class="form-label"
+            for="name"
+          >
+            Name
+          </label>
+          <input
+            class="form-control"
+            id="name"
+            name="name"
+            placeholder="Enter your name"
+            type="text"
+          />
+          <div
+            class="invalid-feedback"
+          />
+        </div>
+        <div
+          class="mb-3"
+        >
+          <label
+            class="form-label"
+            for="email"
+          >
+            Email
+          </label>
+          <input
+            class="form-control"
+            id="email"
+            name="email"
+            pattern="^[^\\\\s@]+@[^\\\\s@]+\\\\.[^\\\\s@]+$"
+            placeholder="Enter your email"
+            type="email"
+          />
+          <div
+            class="invalid-feedback"
+          >
+            Please enter a valid email address
+          </div>
+        </div>
+        <div
+          class="mb-3"
+        >
+          <label
+            class="form-label"
+            for="password"
+          >
+            Password
+          </label>
+          <input
+            class="form-control"
+            id="password"
+            name="password"
+            placeholder="Enter your password"
+            type="password"
+          />
+          <div
+            class="invalid-feedback"
+          />
+        </div>
+        <div
+          class="mb-3"
+        >
+          <label
+            class="form-label"
+            for="confirmPassword"
+          >
+            Confirm Password
+          </label>
+          <input
+            class="form-control"
+            id="confirmPassword"
+            name="confirmPassword"
+            placeholder="Confirm your password"
+            type="password"
+          />
+          <div
+            class="invalid-feedback"
+          />
+        </div>
+        <button
+          class="form-control mb-3 btn btn-primary"
+          style="background-color: rgb(79, 107, 237);"
+          type="submit"
+        >
+          Sign Up
+        </button>
+        <div
+          class="text-center mt-3"
+        >
+          <small>
+            Already have an account?
+             
+            <a
+              href="/login"
+              style="color: rgb(79, 107, 237);"
+            >
+              Sign In
+            </a>
+          </small>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+`;
