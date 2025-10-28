@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
-const API_URL = "http://127.0.0.1:8080/categories";
+const API_URL = "https://maliyah-server.onrender.com/categories";
 
 // Add a new category
 export const addCategory = createAsyncThunk(
@@ -112,3 +112,4 @@ const categorySlice = createSlice({
 
 export const { resetCategoryFlags } = categorySlice.actions;
 export default categorySlice.reducer;
+
