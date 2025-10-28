@@ -4,18 +4,18 @@ import axios from 'axios';
 
 
 export const addUser = createAsyncThunk('user/addUser', async (userData) => {
-  const response = await axios.post('http://127.0.0.1:8080/insertUser', userData);
+  const response = await axios.post('https://maliyah-server.onrender.com/insertUser', userData);
   return response.data;
 });
 
 export const updateUser = createAsyncThunk('user/updateUser', async (userData) => {
-  const response = await axios.put('http://127.0.0.1:8080/updateUser', userData);
+  const response = await axios.put('https://maliyah-server.onrender.com/updateUser', userData);
   return response.data;
 });
 
 export const getUser = createAsyncThunk('user/getUser', async (userData, thunkAPI) => {
   try {
-    const response = await axios.post('http://127.0.0.1:8080/login', {
+    const response = await axios.post('https://maliyah-server.onrender.com/login', {
       email: userData.email,
       password: userData.password,
     });
@@ -26,7 +26,7 @@ export const getUser = createAsyncThunk('user/getUser', async (userData, thunkAP
 });
 
 export const logout = createAsyncThunk('user/logout', async () => {
-  const response = await axios.post('http://127.0.0.1:8080/logout');
+  const response = await axios.post('https://maliyah-server.onrender.com/logout');
   return response.data;
 });
 
@@ -115,3 +115,4 @@ const UserSlice = createSlice({
 
 export const { resetMessage, resetFlags } = UserSlice.actions;
 export default UserSlice.reducer;
+
