@@ -31,7 +31,7 @@ const ResetPassword = () => {
     }
 
     axios
-      .post("http://localhost:8080/reset-password", {
+      .post("https://maliyah-server.onrender.com/reset-password", {
         email,
         resetCode,
         newPassword,
@@ -137,3 +137,4 @@ const ResetPassword = () => {
 };
 
 export default ResetPassword;
+
