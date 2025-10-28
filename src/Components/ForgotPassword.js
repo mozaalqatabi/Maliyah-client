@@ -19,7 +19,7 @@ const ForgotPassword = () => {
     setIsSubmitting(true);
 
     axios
-      .post("http://localhost:8080/forgot-password", { email })
+      .post("https://maliyah-server.onrender.com/forgot-password", { email })
       .then((res) => {
         localStorage.setItem("resetEmail", email);
         setSuccess("Code sent! Check your email.");
@@ -110,3 +110,4 @@ const ForgotPassword = () => {
 };
 
 export default ForgotPassword;
+
