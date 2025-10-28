@@ -52,7 +52,7 @@ const AddRecord = () => {
     const fetchRecords = async () => {
       if (!userEmail) return;
       try {
-        const res = await axios.get(`http://localhost:8080/records/${userEmail}`);
+        const res = await axios.get(`https://maliyah-server.onrender.com/records/${userEmail}`);
         dispatch(setRecords(res.data));
       } catch (err) {
         console.error('Error fetching records:', err);
@@ -120,11 +120,11 @@ const AddRecord = () => {
 
     try {
       if (editMode) {
-        const res = await axios.put(`http://localhost:8080/records/${editingRecordId}`, transaction);
+        const res = await axios.put(`https://maliyah-server.onrender.com/records/${editingRecordId}`, transaction);
         dispatch(updateRecord(res.data));
         setSuccessMessage('Record updated successfully!');
       } else {
-        const res = await axios.post('http://localhost:8080/records', transaction);
+        const res = await axios.post('https://maliyah-server.onrender.com/records', transaction);
         dispatch(addRecord(res.data));
         setSuccessMessage('Record added successfully!');
       }
@@ -154,7 +154,7 @@ const AddRecord = () => {
   const handleDelete = async () => {
     if (!deleteConfirm.id) return;
     try {
-      await axios.delete(`http://localhost:8080/records/${deleteConfirm.id}`);
+      await axios.delete(`https://maliyah-server.onrender.com/records/${deleteConfirm.id}`);
       dispatch(deleteRecord(deleteConfirm.id));
       setDeleteConfirm({ show: false, id: null });
       setShowSuccess(true);
@@ -410,3 +410,4 @@ const AddRecord = () => {
 };
 
 export default AddRecord;
+
