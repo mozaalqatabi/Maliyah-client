@@ -39,7 +39,7 @@ const Statistics = () => {
     if (!userEmail) return;
     const fetchRecords = async () => {
       try {
-        const res = await axios.get(`http://localhost:8080/records/${userEmail}`);
+        const res = await axios.get(`https://maliyah-server.onrender.com/records/${userEmail}`);
         dispatch(setRecords(res.data));
       } catch (err) {
         console.error('Failed to fetch records:', err);
@@ -264,3 +264,4 @@ const Statistics = () => {
 };
 
 export default Statistics;
+
