@@ -8,7 +8,7 @@ const AdminFeedback = () => {
   useEffect(() => {
     const fetchFeedbacks = async () => {
       try {
-        const res = await axios.get('http://localhost:8080/feedbacks');
+        const res = await axios.get('https://maliyah-server.onrender.com/feedbacks');
         setFeedbacks(res.data);
       } catch (err) {
         console.error("Error fetching feedbacks:", err);
@@ -49,3 +49,4 @@ const AdminFeedback = () => {
 };
 
 export default AdminFeedback;
+
