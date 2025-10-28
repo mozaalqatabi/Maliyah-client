@@ -107,7 +107,7 @@ const Goals = () => {
     dispatch(fetchFinancialSummary(userEmail));
     
     // Fetch categories from database
-    fetch(`http://localhost:8080/categories/${userEmail}`)
+    fetch(`https://maliyah-server.onrender.com/categories/${userEmail}`)
       .then(res => res.json())
       .then(data => {
         // Extract category names for the dropdown
@@ -124,14 +124,14 @@ const Goals = () => {
       });
     
     // Fetch goals
-    fetch(`http://localhost:8080/goals/${userId}`)
+    fetch(`https://maliyah-server.onrender.com/goals/${userId}`)
       .then(res => res.json())
       .then(data => setGoals(data))
       .catch(() => setGoals([]));
 
     // Fetch insights and show popup only if enabled
     if (insightsEnabled) {
-      fetch(`http://localhost:8080/goals/insights/${userId}`)
+      fetch(`https://maliyah-server.onrender.com/goals/insights/${userId}`)
         .then(res => res.json())
         .then(data => {
           if (data.suggestions && data.suggestions.length > 0) {
@@ -251,7 +251,7 @@ const Goals = () => {
         dispatch(fetchFinancialSummary(userEmail));
         
         // Also refresh categories in case user added new ones
-        fetch(`http://localhost:8080/categories/${userEmail}`)
+        fetch(`https://maliyah-server.onrender.com/categories/${userEmail}`)
           .then(res => res.json())
           .then(data => {
             const categoryNames = data.map(cat => cat.name);
@@ -370,7 +370,7 @@ const Goals = () => {
 
     // Handler to delete a goal
     const handleDeleteGoal = (goalId) => {
-      fetch(`http://localhost:8080/goals/${goalId}`, {
+      fetch(`https://maliyah-server.onrender.com/goals/${goalId}`, {
         method: 'DELETE',
       })
         .then(res => res.json())
@@ -401,7 +401,7 @@ const Goals = () => {
         return;
       }
 
-      fetch(`http://localhost:8080/goals/${editGoal._id}`, {
+      fetch(`https://maliyah-server.onrender.com/goals/${editGoal._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...editGoal, targetAmount: parsedTarget })
@@ -442,7 +442,7 @@ const Goals = () => {
     }
 
     // POST to new backend endpoint to allocate and create expense record
-    fetch('http://localhost:8080/api/goals/allocate', {
+    fetch('https://maliyah-server.onrender.com/api/goals/allocate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -508,7 +508,7 @@ const Goals = () => {
       category: newGoal.category
     };
 
-    fetch('http://localhost:8080/goals', {
+    fetch('https://maliyah-server.onrender.com/goals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(goal)
@@ -959,3 +959,4 @@ const Goals = () => {
 };
 
 export default Goals;
+
