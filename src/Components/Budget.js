@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Swal from 'sweetalert2';
  
-const API = import.meta?.env?.VITE_API_URL || 'http://localhost:8080';
+const API = import.meta?.env?.VITE_API_URL || 'https://maliyah-server.onrender.com';
  
 // --- helpers ---
 const monthName = (m) =>
@@ -870,4 +870,5 @@ export default function Budget() {
       )}
     </Container>
   );
+
 }
