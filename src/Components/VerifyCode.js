@@ -20,7 +20,7 @@ const VerifyCode = () => {
     setIsSubmitting(true);
 
     axios
-      .post("http://localhost:8080/verify-reset-code", { email, resetCode })
+      .post("https://maliyah-server.onrender.com/verify-reset-code", { email, resetCode })
       .then((res) => {
         setSuccess("Code verified!");
         setTimeout(() => navigate("/reset-password"), 1000);
@@ -108,3 +108,4 @@ const VerifyCode = () => {
 };
 
 export default VerifyCode;
+
