@@ -31,7 +31,7 @@ const StatementReport = () => {
     if (!userEmail) return console.error('No user email found!');
     setLoading(true);
     try {
-      const res = await axios.get(`http://localhost:8080/records/${userEmail}`);
+      const res = await axios.get(`https://maliyah-server.onrender.com/records/${userEmail}`);
       console.log('Fetched records:', res.data); // Debug
       setTransactions(res.data);
     } catch (err) {
@@ -204,3 +204,4 @@ const StatementReport = () => {
 };
 
 export default StatementReport;
+
