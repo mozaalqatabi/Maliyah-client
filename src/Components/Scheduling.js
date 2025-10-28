@@ -10,7 +10,7 @@ import axios from 'axios';
 import Swal from 'sweetalert2';
 import { formatDateDDMMYYYY, getCurrentDateForInput } from '../utils/dateUtils';
 
-const API = import.meta?.env?.VITE_API_URL || 'http://localhost:8080';
+const API = import.meta?.env?.VITE_API_URL || 'https://maliyah-server.onrender.com';
 
 /**
 * Toast (quick toasts) — same config used across pages for consistent UX
@@ -632,4 +632,5 @@ export default function Scheduling() {
       )}
     </Container>
   );
+
 }
