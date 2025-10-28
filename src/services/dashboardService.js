@@ -1,7 +1,7 @@
 // src/services/dashboardService.js
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'https://maliyah-server.onrender.com';
 
 // Get dashboard analytics data
 export const getDashboardAnalytics = async (userEmail) => {
@@ -129,4 +129,5 @@ export const getFinancialSummary = async (userEmail) => {
     console.error('Error calculating financial summary:', error);
     throw error;
   }
+
 };
