@@ -20,7 +20,7 @@ const Categories = () => {
     const fetchCategories = async () => {
       if (!userEmail) return;
       try {
-        const res = await axios.get(`http://localhost:8080/categories/${userEmail}`);
+        const res = await axios.get(`https://maliyah-server.onrender.com/categories/${userEmail}`);
         setCategories(res.data);
       } catch (err) {
         console.error(err);
@@ -50,7 +50,7 @@ const Categories = () => {
     }
 
     try {
-      const res = await axios.post('http://localhost:8080/categories', {
+      const res = await axios.post('https://maliyah-server.onrender.com/categories', {
         name: trimmedName,
         type: newCategory.type,
         userEmail
@@ -69,7 +69,7 @@ const Categories = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://localhost:8080/categories/${id}`);
+      await axios.delete(`https://maliyah-server.onrender.com/categories/${id}`);
       setCategories(categories.filter(cat => cat._id !== id));
       setSuccessMessage('Category deleted successfully!');
       setTimeout(() => setSuccessMessage(''), 3000);
@@ -191,3 +191,4 @@ const Categories = () => {
 };
 
 export default Categories;
+
