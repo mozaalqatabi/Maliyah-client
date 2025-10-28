@@ -582,7 +582,7 @@ const DashboardPage = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:8080/goals/${finalUserId}`);
+      const response = await fetch(`https://maliyah-server.onrender.com/goals/${finalUserId}`);
       const data = await response.json();
       console.log('Goals fetched:', data.length, data);
       setDashboardGoals(data);
@@ -611,7 +611,7 @@ const DashboardPage = () => {
       dispatch(fetchDashboardData({ userEmail, userId: finalUserId }));
       
       // Direct fetch for goals (same as Goals component)
-      fetch(`http://localhost:8080/goals/${finalUserId}`)
+      fetch(`https://maliyah-server.onrender.com0/goals/${finalUserId}`)
         .then(res => res.json())
         .then(data => {
           console.log('Direct goals fetch result:', data);
@@ -632,7 +632,7 @@ const DashboardPage = () => {
         dispatch(fetchDashboardData({ userEmail, userId: finalUserId }));
         
         // Also refresh goals directly
-        fetch(`http://localhost:8080/goals/${finalUserId}`)
+        fetch(`https://maliyah-server.onrender.com/goals/${finalUserId}`)
           .then(res => res.json())
           .then(data => setDashboardGoals(data))
           .catch(error => console.error('Auto-refresh goals error:', error));
@@ -670,7 +670,7 @@ const DashboardPage = () => {
       );
       
       // Also refresh goals directly
-      fetch(`http://localhost:8080/goals/${finalUserId}`)
+      fetch(`https://maliyah-server.onrender.com0/goals/${finalUserId}`)
         .then(res => res.json())
         .then(data => setDashboardGoals(data))
         .catch(error => console.error('Goals refresh error:', error));
@@ -2163,3 +2163,4 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
+
