@@ -72,7 +72,7 @@ const Reminders = () => {
     const refetchGoalsData = () => {
       // Only refresh reminders here; insights are handled elsewhere (Goals page)
       if (!userId) return;
-      fetch(`http://localhost:8080/reminders/${userId}`)
+      fetch(`https://maliyah-server.onrender.com/reminders/${userId}`)
         .then(res => res.json())
         .then(data => setReminders(data))
         .catch(() => setReminders([]));
@@ -80,7 +80,7 @@ const Reminders = () => {
 
     const refetchSchedulesData = () => {
       if (!user?.email || !preferences.schedule) return;
-      fetch(`http://localhost:8080/schedules/${user.email}`)
+      fetch(`https://maliyah-server.onrender.com/schedules/${user.email}`)
         .then(res => res.json())
         .then(data => setSchedules(data))
         .catch(() => setSchedules([]));
@@ -88,7 +88,7 @@ const Reminders = () => {
 
     const refetchBudgetsData = () => {
       if (!user?.email || !preferences.budget) return;
-      fetch(`http://localhost:8080/api/budgets/summary?userEmail=${encodeURIComponent(user.email)}`)
+      fetch(`https://maliyah-server.onrender.com/api/budgets/summary?userEmail=${encodeURIComponent(user.email)}`)
         .then(res => res.json())
         .then(data => {
           const alerts = generateBudgetAlerts(data || []);
@@ -141,7 +141,7 @@ const Reminders = () => {
   const [reminders, setReminders] = useState([]);
   useEffect(() => {
     if (!userId) return;
-    fetch(`http://localhost:8080/reminders/${userId}`)
+    fetch(`https://maliyah-server.onrender.com/reminders/${userId}`)
       .then(res => res.json())
       .then(data => setReminders(data))
       .catch(() => setReminders([]));
@@ -150,7 +150,7 @@ const Reminders = () => {
   // Fetch schedules when scheduling toggle is enabled
   useEffect(() => {
     if (preferences.schedule && user?.email) {
-      fetch(`http://localhost:8080/schedules/${user.email}`)
+      fetch(`https://maliyah-server.onrender.com/schedules/${user.email}`)
         .then(res => res.json())
         .then(data => setSchedules(data))
         .catch(() => setSchedules([]));
@@ -163,7 +163,7 @@ const Reminders = () => {
   useEffect(() => {
     if (preferences.budget && user?.email) {
       console.log('Fetching budget alerts for:', user.email);
-      fetch(`http://localhost:8080/api/budgets/summary?userEmail=${user.email}`)
+      fetch(`https://maliyah-server.onrender.com/api/budgets/summary?userEmail=${user.email}`)
         .then(res => res.json())
         .then(data => {
           console.log('Budget data received:', data);
@@ -185,7 +185,7 @@ const Reminders = () => {
     const handleFocus = () => {
       if (preferences.budget && user?.email) {
         // Refresh budget alerts when user returns to this page
-        fetch(`http://localhost:8080/api/budgets/summary?userEmail=${user.email}`)
+        fetch(`https://maliyah-server.onrender.com/api/budgets/summary?userEmail=${user.email}`)
           .then(res => res.json())
           .then(data => {
             const alerts = generateBudgetAlerts(data);
@@ -411,7 +411,7 @@ const Reminders = () => {
       ));
       
       // Update on backend
-      await fetch(`http://localhost:8080/reminders/${id}`, {
+      await fetch(`https://maliyah-server.onrender.com/reminders/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -451,7 +451,7 @@ const Reminders = () => {
       }
       
       // For regular reminders, delete from backend
-      const res = await fetch(`http://localhost:8080/reminders/${id}`, {
+      const res = await fetch(`https://maliyah-server.onrender.com/reminders/${id}`, {
         method: 'DELETE'
       });
       
@@ -1197,3 +1197,4 @@ const Reminders = () => {
 };
 
 export default Reminders;
+
