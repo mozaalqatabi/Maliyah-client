@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Container, Row, Col, Card, Button, ProgressBar, Alert } from 'react-bootstrap';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -544,9 +545,117 @@ const DashboardPage = () => {
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [refreshInterval, setRefreshInterval] = useState(null);
   const [dashboardGoals, setDashboardGoals] = useState([]);
+  const [budgets, setBudgets] = useState([]);
+  const [reminders, setReminders] = useState([]);
+  const [schedules, setSchedules] = useState([]);
+  const [insightsToShow, setInsightsToShow] = useState([]);
+  const insightSeverityColor = { critical: '#f87171', warning: '#f59e0b', info: '#60a5fa' };
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
+  // ---- Inlined insight helper functions () ----
+  const groupByMonth = (records) => {
+    const map = {};
+    (records || []).forEach(r => {
+      const dateStr = r.startDate || r.date || r.createdAt || r.timestamp;
+      if (!dateStr) return;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      map[key] = map[key] || { total: 0, byCategory: {} };
+      if (r.type === 'expense') {
+        const amt = Math.abs(Number(r.amount) || 0);
+        map[key].total += amt;
+        const cat = r.category || 'Other';
+        map[key].byCategory[cat] = (map[key].byCategory[cat] || 0) + amt;
+      }
+    });
+    return map;
+  };
+
+  const percentChange = (previous, current) => {
+    if (!previous) return Infinity;
+    return ((current - previous) / previous) * 100;
+  };
+
+  const computeOverspendInsights = (records, opts = { percentThreshold: 20, minAmount: 5 }) => {
+    const months = groupByMonth(records);
+    const keys = Object.keys(months).sort();
+    if (keys.length < 2) return [];
+    const last = months[keys[keys.length - 1]];
+    const prev = months[keys[keys.length - 2]] || { byCategory: {} };
+    const insights = [];
+    Object.keys(last.byCategory).forEach(cat => {
+      const lastAmt = last.byCategory[cat] || 0;
+      const prevAmt = prev.byCategory[cat] || 0;
+      if (lastAmt < opts.minAmount) return;
+      // If previous amount is zero (no spending previous period), treat as new spending
+      if (!prevAmt || prevAmt === 0) {
+        insights.push({
+          id: `new_spend_${cat}_${keys[keys.length - 1]}`,
+          text: `You spent OMR ${lastAmt.toFixed(3)} on ${cat} this month (no spending in the previous period).`,
+          severity: 'warning',
+          // impact: absolute amount newly spent (higher = more important)
+          impact: lastAmt,
+          meta: { lastAmt, prevAmt }
+        });
+        return;
+      }
+      const change = percentChange(prevAmt, lastAmt);
+      if (change >= opts.percentThreshold) {
+        // Provide more helpful phrasing for large percentages by showing amounts
+        const pct = Math.round(change);
+        const lastAmtStr = lastAmt.toFixed(3);
+        const prevAmtStr = prevAmt.toFixed(3);
+        // If the multiplier is large (e.g., >=2x), prefer an 'Nx as much' phrasing
+        const multiplier = prevAmt > 0 ? (lastAmt / prevAmt) : Infinity;
+        let message = '';
+        if (multiplier >= 2) {
+          // For sizeable increases prefer the multiplier phrasing (e.g., 2.5x)
+          message = `You spent ${multiplier.toFixed(1)}x as much on ${cat} this month (OMR ${lastAmtStr} vs OMR ${prevAmtStr}).`;
+        } else {
+          // Keep percent phrasing for smaller relative changes, include amounts for clarity
+          message = `You spent ${pct}% more on ${cat} this month (OMR ${lastAmtStr} vs OMR ${prevAmtStr}).`;
+        }
+
+        insights.push({
+          id: `overspend_${cat}_${keys[keys.length - 1]}`,
+          text: message,
+          severity: 'warning',
+          // impact measured as absolute increase (last - prev)
+          impact: Math.max(0, lastAmt - prevAmt),
+          meta: { lastAmt, prevAmt, pctChange: change }
+        });
+      }
+    });
+    return insights;
+  };
+
+  const computeLowBalanceInsight = (financialSummary, records, opts = { pctOfMonthly: 0.2, minAbsolute: 10 }) => {
+    if (!financialSummary) return null;
+    const currentBalance = Number(financialSummary.currentBalance || 0);
+    const months = groupByMonth(records);
+    const keys = Object.keys(months).sort();
+    let lastTotal = 0;
+    if (keys.length > 0) {
+      lastTotal = months[keys[keys.length - 1]].total || 0;
+    }
+    const threshold = Math.max(opts.minAbsolute, lastTotal * opts.pctOfMonthly);
+    if (currentBalance < threshold) {
+      const deficit = threshold - currentBalance;
+      return {
+        id: `low_balance_${new Date().toISOString().slice(0,10)}`,
+        text: `Low balance: OMR ${currentBalance.toFixed(3)} available (threshold OMR ${threshold.toFixed(3)}).`,
+        severity: 'critical',
+        // impact: how far below the threshold the balance is (higher = more urgent)
+        impact: deficit,
+        meta: { currentBalance, threshold }
+      };
+    }
+    return null;
+  };
+  // ---- end inlined helpers ----
 
   // Redux selectors
   const loading = useSelector(selectDashboardLoading);
@@ -565,7 +674,7 @@ const DashboardPage = () => {
   const userEmail = storedUser?.email;
   const userId = storedUser?._id;
 
-  // Also try getting user from Redux like Goals component does
+
   const reduxUser = useSelector((state) => state.counter?.user);
   const reduxUserId = reduxUser?._id;
 
@@ -611,7 +720,7 @@ const DashboardPage = () => {
       dispatch(fetchDashboardData({ userEmail, userId: finalUserId }));
       
       // Direct fetch for goals (same as Goals component)
-      fetch(`https://maliyah-server.onrender.com0/goals/${finalUserId}`)
+      fetch(`https://maliyah-server.onrender.com/goals/${finalUserId}`)
         .then(res => res.json())
         .then(data => {
           console.log('Direct goals fetch result:', data);
@@ -621,8 +730,124 @@ const DashboardPage = () => {
           console.error('Direct goals fetch error:', error);
           setDashboardGoals([]);
         });
+      // Fetch budgets summary for Top Budgets section
+      fetch(`https://maliyah-server.onrender.com/api/budgets/summary?userEmail=${encodeURIComponent(userEmail)}`)
+        .then(res => res.json())
+        .then(data => {
+          // Ensure we have an array
+          setBudgets(Array.isArray(data) ? data : []);
+        })
+        .catch(err => {
+          console.error('Failed to fetch budgets summary', err);
+          setBudgets([]);
+        });
+      // Fetch schedules for Top Schedules card
+      fetch(`https://maliyah-server.onrender.com/schedules/${encodeURIComponent(userEmail)}`)
+        .then(res => res.json())
+        .then(data => {
+          const arr = Array.isArray(data) ? data : [];
+          console.log('Dashboard: initial schedules fetched', arr.length);
+          setSchedules(arr);
+        })
+        .catch(err => {
+          console.error('Failed to fetch schedules', err);
+          setSchedules([]);
+        });
+      // Fetch reminders for Top Reminders section
+      fetch(`https://maliyah-server.onrender.com/reminders/${finalUserId}`)
+        .then(res => res.json())
+        .then(data => {
+          const arr = Array.isArray(data) ? data : [];
+          console.log('Dashboard: initial reminders fetched', arr.length, arr);
+          setReminders(arr);
+        })
+        .catch(err => {
+          console.error('Failed to fetch reminders', err);
+          setReminders([]);
+        });
     }
   }, [dispatch, userEmail, userId, reduxUserId]);
+
+  // Compute simple rule-based insights (overspend and low balance)
+  useEffect(() => {
+    try {
+      // gather inputs
+      const records = Array.isArray(allTransactions) ? allTransactions : [];
+      const fs = financialSummary || {};
+
+      // compute candidate insights
+      const overspends = computeOverspendInsights(records, { percentThreshold: 20, minAmount: 5 });
+      const lowBal = computeLowBalanceInsight(fs, records, { pctOfMonthly: 0.2, minAbsolute: 10 });
+      const candidates = [];
+  if (lowBal) candidates.push(lowBal);
+  if (overspends && overspends.length) candidates.push(...overspends);
+
+      // dedupe by id and filter out seen insights from localStorage (24h)
+      // Scope seen map per-user to avoid cross-account interference
+      const finalUserKey = userId || reduxUserId || userEmail;
+      const seenStorageKey = finalUserKey ? `dashboardInsightsSeen_${finalUserKey}` : 'dashboardInsightsSeen';
+      let seenRaw = localStorage.getItem(seenStorageKey);
+      // If we don't have a user-scoped value yet but a global value exists, migrate it
+      if ((!seenRaw || seenRaw === '{}') && finalUserKey) {
+        const globalRaw = localStorage.getItem('dashboardInsightsSeen');
+        if (globalRaw) {
+          try {
+            localStorage.setItem(seenStorageKey, globalRaw);
+            seenRaw = globalRaw;
+          } catch (e) {
+            // ignore storage errors
+          }
+        }
+      }
+      let seen = {};
+      try { seen = seenRaw ? JSON.parse(seenRaw) : {}; } catch (e) { seen = {}; }
+      const now = Date.now();
+      const fresh = [];
+      candidates.forEach(c => {
+        const seenTs = seen[c.id];
+        if (!seenTs || (now - seenTs) > 24 * 60 * 60 * 1000) {
+          fresh.push(c);
+        }
+      });
+
+      // Sort fresh insights by severity then by impact (both descending)
+      const severityWeight = (s) => {
+        if (!s) return 0;
+        if (s === 'critical') return 3;
+        if (s === 'warning') return 2;
+        if (s === 'info') return 1;
+        return 0;
+      };
+
+      fresh.sort((a, b) => {
+        const wA = severityWeight(a.severity);
+        const wB = severityWeight(b.severity);
+        if (wA !== wB) return wB - wA; // higher severity first
+        const impA = typeof a.impact === 'number' ? a.impact : 0;
+        const impB = typeof b.impact === 'number' ? b.impact : 0;
+        return impB - impA; // higher impact first
+      });
+
+  setInsightsToShow(fresh.slice(0, 5));
+    } catch (e) {
+      console.error('Insight compute error', e);
+    }
+  }, [allTransactions, financialSummary]);
+
+  const dismissInsight = (id) => {
+    try {
+        const finalUserKey = userId || reduxUserId || userEmail;
+        const seenStorageKey = finalUserKey ? `dashboardInsightsSeen_${finalUserKey}` : 'dashboardInsightsSeen';
+        const seenRaw = localStorage.getItem(seenStorageKey);
+        let seen = {};
+        try { seen = seenRaw ? JSON.parse(seenRaw) : {}; } catch (e) { seen = {}; }
+        seen[id] = Date.now();
+        localStorage.setItem(seenStorageKey, JSON.stringify(seen));
+      setInsightsToShow(prev => prev.filter(i => i.id !== id));
+    } catch (e) {
+      console.error('Failed to dismiss insight', e);
+    }
+  };
 
   // Auto-refresh functionality
   useEffect(() => {
@@ -636,6 +861,29 @@ const DashboardPage = () => {
           .then(res => res.json())
           .then(data => setDashboardGoals(data))
           .catch(error => console.error('Auto-refresh goals error:', error));
+        // Also refresh budgets summary during auto-refresh
+        fetch(`https://maliyah-server.onrender.com/api/budgets/summary?userEmail=${encodeURIComponent(userEmail)}`)
+          .then(res => res.json())
+          .then(data => setBudgets(Array.isArray(data) ? data : []))
+          .catch(err => console.error('Auto-refresh budgets error:', err));
+        // Also refresh reminders during auto-refresh
+        fetch(`https://maliyah-server.onrender.com/reminders/${finalUserId}`)
+          .then(res => res.json())
+          .then(data => {
+            const arr = Array.isArray(data) ? data : [];
+            console.log('Dashboard: auto-refresh reminders fetched', arr.length);
+            setReminders(arr);
+          })
+          .catch(err => console.error('Auto-refresh reminders error:', err));
+        // Also refresh schedules during auto-refresh
+        fetch(`https://maliyah-server.onrender.com/schedules/${encodeURIComponent(userEmail)}`)
+          .then(res => res.json())
+          .then(data => {
+            const arr = Array.isArray(data) ? data : [];
+            console.log('Dashboard: auto-refresh schedules fetched', arr.length);
+            setSchedules(arr);
+          })
+          .catch(err => console.error('Auto-refresh schedules error:', err));
         
         setLastRefresh(new Date());
       }, 30000); // Refresh every 30 seconds
@@ -670,10 +918,15 @@ const DashboardPage = () => {
       );
       
       // Also refresh goals directly
-      fetch(`https://maliyah-server.onrender.com0/goals/${finalUserId}`)
+      fetch(`https://maliyah-server.onrender.com/goals/${finalUserId}`)
         .then(res => res.json())
         .then(data => setDashboardGoals(data))
         .catch(error => console.error('Goals refresh error:', error));
+      // Refresh budgets summary on manual refresh
+      fetch(`https://maliyah-server.onrender.com0/api/budgets/summary?userEmail=${encodeURIComponent(userEmail)}`)
+        .then(res => res.json())
+        .then(data => setBudgets(Array.isArray(data) ? data : []))
+        .catch(err => console.error('Budgets refresh error:', err));
       
       setLastRefresh(new Date());
     }
@@ -690,6 +943,102 @@ const DashboardPage = () => {
       }
     );
   };
+
+  // Listen for budgetsUpdated (cross-tab via storage and same-tab via CustomEvent)
+  React.useEffect(() => {
+    const fetchBudgetsSummary = () => {
+      if (!userEmail) return;
+      fetch(`https://maliyah-server.onrender.com/api/budgets/summary?userEmail=${encodeURIComponent(userEmail)}`)
+        .then(res => res.json())
+        .then(data => setBudgets(Array.isArray(data) ? data : []))
+        .catch(err => {
+          console.error('Failed to fetch budgets summary (listener)', err);
+          setBudgets([]);
+        });
+    };
+
+    const onStorage = (e) => {
+      if (e.key === 'budgetsUpdated') {
+        fetchBudgetsSummary();
+      }
+    };
+
+    const onCustom = (e) => {
+      // same-window CustomEvent with detail may be used elsewhere
+      fetchBudgetsSummary();
+    };
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('budgetsUpdated', onCustom);
+
+    // cleanup
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('budgetsUpdated', onCustom);
+    };
+  }, [userEmail]);
+
+  // Listen for remindersUpdated (cross-tab via storage and same-tab via CustomEvent)
+  React.useEffect(() => {
+    const fetchReminders = () => {
+      if (!userEmail) return;
+      const finalUserId = userId || reduxUserId;
+      if (!finalUserId) return;
+      fetch(`https://maliyah-server.onrender.com/reminders/${finalUserId}`)
+        .then(res => res.json())
+        .then(data => setReminders(Array.isArray(data) ? data : []))
+        .catch(err => {
+          console.error('Failed to fetch reminders (listener)', err);
+          setReminders([]);
+        });
+    };
+
+    const onStorage = (e) => {
+      if (e.key === 'remindersUpdated') fetchReminders();
+    };
+
+    const onCustom = (e) => {
+      fetchReminders();
+    };
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('remindersUpdated', onCustom);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('remindersUpdated', onCustom);
+    };
+  }, [userEmail, userId, reduxUserId]);
+
+  // Listen for schedulesUpdated (cross-tab via storage and same-tab via CustomEvent)
+  React.useEffect(() => {
+    const fetchSchedules = () => {
+      if (!userEmail) return;
+      fetch(`https://maliyah-server.onrender.com/schedules/${encodeURIComponent(userEmail)}`)
+        .then(res => res.json())
+        .then(data => setSchedules(Array.isArray(data) ? data : []))
+        .catch(err => {
+          console.error('Failed to fetch schedules (listener)', err);
+          setSchedules([]);
+        });
+    };
+
+    const onStorage = (e) => {
+      if (e.key === 'schedulesUpdated') fetchSchedules();
+    };
+
+    const onCustom = (e) => {
+      fetchSchedules();
+    };
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('schedulesUpdated', onCustom);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('schedulesUpdated', onCustom);
+    };
+  }, [userEmail]);
 
   const getTimeAgo = (date) => {
     return formatDistanceToNow(date, { addSuffix: true });
@@ -1018,6 +1367,8 @@ const DashboardPage = () => {
           </Col>
         </Row>
       </div>
+
+      {/* (Insights moved below the Financial Insights card) */}
 
       {/* Dynamic Overview Cards */}
       <div className="cards-animated">
@@ -1782,47 +2133,9 @@ const DashboardPage = () => {
                       </div>
                     )}
                     
-                    {/* Summary Stats */}
-                    <div className="row g-3 mt-4">
-                      <div className="col-md-3">
-                        <div className="text-center p-3 bg-success bg-opacity-10 rounded">
-                          <div className="h5 fw-bold text-success mb-1">
-                            {formatCurrency(getChartData().reduce((sum, item) => sum + item.income, 0))}
-                          </div>
-                          <div className="small text-muted">Total Income</div>
-                        </div>
-                      </div>
-                      <div className="col-md-3">
-                        <div className="text-center p-3 bg-danger bg-opacity-10 rounded">
-                          <div className="h5 fw-bold text-danger mb-1">
-                            {formatCurrency(getChartData().reduce((sum, item) => sum + item.expense, 0))}
-                          </div>
-                          <div className="small text-muted">Total Expenses</div>
-                        </div>
-                      </div>
-                      <div className="col-md-3">
-                        <div className="text-center p-3 bg-primary bg-opacity-10 rounded">
-                          <div className="h5 fw-bold text-primary mb-1">
-                            {formatCurrency(
-                              getChartData().reduce((sum, item) => sum + item.income, 0) - 
-                              getChartData().reduce((sum, item) => sum + item.expense, 0)
-                            )}
-                          </div>
-                          <div className="small text-muted">Net Amount</div>
-                        </div>
-                      </div>
-                      <div className="col-md-3">
-                        <div className="text-center p-3 bg-info bg-opacity-10 rounded">
-                          <div className="h5 fw-bold text-info mb-1">
-                            {getChartData().length > 0 ? 
-                             Math.round((getChartData().reduce((sum, item) => sum + item.expense, 0) / 
-                                       Math.max(1, getChartData().reduce((sum, item) => sum + item.income, 0))) * 100) : 
-                             0}%
-                          </div>
-                          <div className="small text-muted">Expense Ratio</div>
-                        </div>
-                      </div>
-                    </div>
+                    {/* Summary stats removed per request (Total Income/Expenses/Net/Expense Ratio) */}
+                    {/* Top Reminders removed per request (use Top Schedules in right column) */}
+                    
                   </div>
                 ) : (
                   <div className="text-center py-5">
@@ -1835,11 +2148,119 @@ const DashboardPage = () => {
                   </div>
                 )}
               </div>
+
+            
+
             </Card.Body>
           </Card>
         </Col>
 
         <Col lg={4}>
+          {/* Budget Overview card (Top 4 budgets) */}
+          <Card className="dashboard-card border-0 mb-3" style={{ borderRadius: '16px' }}>
+            <Card.Body>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h5 className="fw-bold mb-0">Budget Overview</h5>
+                <div>
+                  <Button variant="outline-primary" size="sm" onClick={() => navigate('/budget')}>
+                    View All
+                  </Button>
+                </div>
+              </div>
+              {budgets && budgets.length > 0 ? (
+                budgets
+                  .slice()
+                  .sort((a, b) => (Number(b.allocated || 0) - Number(a.allocated || 0)))
+                  .slice(0, 4)
+                  .map((bgt, idx) => {
+                    const allocated = Number(bgt.allocated || 0);
+                    const spent = Number(bgt.spent || 0);
+                    const usedPct = allocated > 0 ? Math.min(100, Math.round((spent / allocated) * 100)) : 0;
+                    return (
+                      <div key={bgt._id || `${bgt.name}-${idx}`} className="mb-3">
+                        <div className="d-flex justify-content-between align-items-center mb-1">
+                          <div className="fw-medium small">{bgt.name || 'Unnamed'}</div>
+                          <div className="text-muted small">{formatCurrency(spent)} / {formatCurrency(allocated)}</div>
+                        </div>
+                        <div style={{ height: '8px', backgroundColor: '#e9ecef', borderRadius: '6px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', backgroundColor: usedPct > 80 ? '#dc3545' : (usedPct > 50 ? '#ffc107' : '#198754'), width: `${usedPct}%`, transition: 'width 0.3s ease' }} />
+                        </div>
+                        <div className="d-flex justify-content-between small mt-1 text-muted">
+                          <span>{usedPct}% used</span>
+                          <span>{formatCurrency(Math.max(0, allocated - spent))} left</span>
+                        </div>
+                      </div>
+                    );
+                  })
+              ) : (
+                <div className="text-center text-muted py-3">
+                  <small>No budgets set</small>
+                </div>
+              )}
+            </Card.Body>
+          </Card>
+          {/* Top Schedules Card */}
+          <Card className="dashboard-card border-0 mb-3" style={{ borderRadius: '16px' }}>
+            <Card.Body>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h5 className="fw-bold mb-0">Top Schedules</h5>
+                <div>
+                  <Button variant="outline-primary" size="sm" onClick={() => navigate('/scheduling')}>
+                    View All
+                  </Button>
+                </div>
+              </div>
+              {schedules && schedules.length > 0 ? (
+                schedules
+                  .slice()
+                  .sort((a, b) => new Date(a.nextDueAt || a.startDate || 0) - new Date(b.nextDueAt || b.startDate || 0))
+                  .slice(0, 4)
+                  .map((s, idx) => {
+                    const due = new Date(s.nextDueAt || s.startDate || Date.now());
+                    const daysUntil = Math.ceil((due - new Date()) / (1000 * 60 * 60 * 24));
+                    // accent color: critical if due within 3 days, warning within 7, green otherwise; inactive = gray
+                    const accent = !s.active ? '#9ca3af' : (daysUntil <= 3 ? '#dc2626' : (daysUntil <= 7 ? '#d97706' : '#059669'));
+                    const leftStyle = { borderLeft: `4px solid ${accent}`, paddingLeft: '12px' };
+                    const icon = s.type === 'income' ? <Banknote size={16} /> : <ShoppingCart size={16} />;
+
+                    return (
+                      <div key={s._id || `${s.categoryName}-${idx}`} className="mb-3">
+                        <div className="d-flex align-items-start" style={leftStyle}>
+                          <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10, borderRadius: 8, background: '#ffffff', boxShadow: '0 4px 12px rgba(0,0,0,0.04)' }}>
+                            {icon}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div className="d-flex justify-content-between align-items-start">
+                              <div className="fw-medium" style={{ fontSize: 14 }}>{(s.type === 'income' ? 'Income' : 'Expense') + ': ' + (s.categoryName || s.category || 'Unnamed')}</div>
+                              <div className="text-muted small">{formatDate(s.nextDueAt || s.startDate || new Date().toISOString())}</div>
+                            </div>
+                            <div className="text-muted small" style={{ marginTop: 6, lineHeight: 1.25 }}>{s.description || ''}</div>
+                            <div className="d-flex gap-2 mt-2 align-items-center">
+                              <div className="small" style={{ background: '#f8fafc', padding: '4px 8px', borderRadius: 8, color: '#374151', border: '1px solid #eef2ff' }}>
+                                {s.freq || s.frequency || '—'}
+                              </div>
+                              <div className="small" style={{ background: '#fff7ed', padding: '4px 8px', borderRadius: 8, color: '#92400e', border: '1px solid #ffedd5' }}>
+                                {formatCurrency(Number(s.amount || 0))}
+                              </div>
+                              {!s.active && (
+                                <div className="small text-muted" style={{ padding: '4px 8px' }}>(inactive)</div>
+                              )}
+                              {daysUntil <= 3 && s.active && (
+                                <div className="small" style={{ background: '#fee2e2', color: '#dc2626', padding: '4px 8px', borderRadius: 8 }}>Due soon</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+              ) : (
+                <div className="text-center text-muted py-3">
+                  <small>No schedules set</small>
+                </div>
+              )}
+            </Card.Body>
+          </Card>
           <Card className="dashboard-card border-0" style={{borderRadius: '16px'}}>
             <Card.Body>
               <h5 className="fw-bold mb-4">💳 Spending by Category</h5>
@@ -1962,6 +2383,61 @@ const DashboardPage = () => {
               </Row>
             </Card.Body>
           </Card>
+        </Col>
+      </Row>
+
+      {/* Rule-based Insights (moved here: after Financial Insights) */}
+      <Row className="mb-3">
+        <Col lg={8}>
+          {insightsToShow.length > 0 ? (
+            insightsToShow.slice(0,5).map(insight => (
+              <Card
+                key={insight.id}
+                className="mb-3 shadow-sm"
+                style={{ borderRadius: 12, borderLeft: `6px solid ${insightSeverityColor[insight.severity] || '#60a5fa'}` }}
+              >
+                <Card.Body className="d-flex justify-content-between align-items-start">
+                  <div>
+                    <div style={{ color: insightSeverityColor[insight.severity] || '#60a5fa', fontWeight: 700, display: 'flex', alignItems: 'center' }}>
+                      {insight.severity === 'critical' ? '🚨' : insight.severity === 'warning' ? '⚠️' : '💡'}
+                      <span className="ms-2" style={{ fontWeight: 700 }}>{insight.title || 'Insight'}</span>
+                    </div>
+                    <div className="mt-1" style={{ color: '#374151' }}>{insight.text}</div>
+                  </div>
+                  <div className="text-end d-flex flex-column align-items-end">
+                    {insight.impact != null && (
+                      <span style={{
+                        backgroundColor: insightSeverityColor[insight.severity] || '#60a5fa',
+                        color: '#fff',
+                        padding: '4px 8px',
+                        borderRadius: 12,
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        marginBottom: 8,
+                      }}>
+                        {typeof insight.impact === 'number' ? `OMR ${insight.impact.toFixed(2)}` : insight.impact}
+                      </span>
+                    )}
+                    <Button variant="outline-secondary" size="sm" onClick={() => dismissInsight(insight.id)}>Dismiss</Button>
+                  </div>
+                </Card.Body>
+              </Card>
+            ))
+          ) : (
+            <Card className="mb-3 shadow-sm" style={{ borderRadius: 12 }}>
+              <Card.Body className="d-flex justify-content-between align-items-center">
+                <div>
+                  <div style={{ fontWeight: 700 }}>No insights right now</div>
+                  <div className="small text-muted">Insights appear when we detect notable changes (e.g., overspend, low balance).</div>
+                </div>
+                <div className="text-end">
+                  <Button size="sm" variant="outline-primary" onClick={() => setInsightsToShow([{ id: 'sample_1', text: 'Sample: You spent 25% more on Food this month (OMR 35.000).', severity: 'warning' }])}>
+                    Show sample insight
+                  </Button>
+                </div>
+              </Card.Body>
+            </Card>
+          )}
         </Col>
       </Row>
 
@@ -2163,4 +2639,3 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
-
