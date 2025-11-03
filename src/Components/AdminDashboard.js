@@ -31,13 +31,15 @@ const AdminDashboard = () => {
   const dispatch = useDispatch();
   const adminEmail = "maliyahmlk@gmail.com";
  
-  // ✅ Regex validator for category names
+  // Regex validator for category names
   const isValidCategoryName = (name) => {
-    // Allows letters, numbers, spaces, and these symbols: / & , . - _
-    // Disallows other special symbols like ^%$#@!~`() etc.
-    const regex = /^[a-zA-Z0-9\s\/&.,_-]+$/;
-    return regex.test(name.trim());
-  };
+  // Must have at least 2 valid characters (letters/numbers)
+  // Allows spaces or one allowed symbol between words (with optional spaces around)
+  const regex = /^(?=.{2,}$)[A-Za-z0-9]+(?:\s?[-\/&.,_]\s?[A-Za-z0-9]+|\s+[A-Za-z0-9]+)*$/;
+  return regex.test(name.trim());
+};
+
+  const isOnlyNumbers = (name) => /^[0-9]+$/.test(name.trim());
  
   // Fetch users
   useEffect(() => {
@@ -95,27 +97,32 @@ const AdminDashboard = () => {
     );
   };
  
-  // ✅ Create new category
+  // Create new category
   const handleCreateCategory = async (e) => {
-    e.preventDefault();
-    setNewErrorMessage('');
- 
-    const trimmedName = newCategory.name.trim();
- 
-    if (!trimmedName) {
-      setNewErrorMessage('Category name is required');
-      return;
-    }
+  e.preventDefault();
+  setNewErrorMessage('');
 
-    if (!isValidCategoryName(trimmedName)) {
-      setNewErrorMessage('Category name contains invalid symbols');
-      return;
-    }
- 
-    if (isDuplicateCategory(trimmedName, newCategory.type)) {
-      setNewErrorMessage('Category already exists');
-      return;
-    }
+  const trimmedName = newCategory.name.trim();
+
+  if (!trimmedName) {
+    setNewErrorMessage('Category name is required');
+    return;
+  }
+
+  if (isOnlyNumbers(trimmedName)) {
+    setNewErrorMessage('Category name cannot contain only numbers');
+    return;
+  }
+
+  if (!isValidCategoryName(trimmedName)) {
+    setNewErrorMessage('invalid Category Name');
+    return;
+  }
+
+  if (isDuplicateCategory(trimmedName, newCategory.type)) {
+    setNewErrorMessage('Category already exists');
+    return;
+  }
  
     try {
       const res = await axios.post('https://maliyah-server.onrender.com/categories', {
@@ -144,20 +151,25 @@ const AdminDashboard = () => {
  
   // ✅ Update category
   const handleUpdateCategory = async (e) => {
-    e.preventDefault();
-    setEditErrorMessage('');
- 
-    const trimmedName = editCategory.name.trim();
- 
-    if (!trimmedName) {
-      setEditErrorMessage('Category name is required');
-      return;
-    }
+  e.preventDefault();
+  setEditErrorMessage('');
 
-    if (!isValidCategoryName(trimmedName)) {
-      setEditErrorMessage('Category name contains invalid symbols');
-      return;
-    }
+  const trimmedName = editCategory.name.trim();
+
+  if (!trimmedName) {
+    setEditErrorMessage('Category name is required');
+    return;
+  }
+
+  if (isOnlyNumbers(trimmedName)) {
+    setEditErrorMessage('Category name cannot contain only numbers');
+    return;
+  }
+
+  if (!isValidCategoryName(trimmedName)) {
+    setEditErrorMessage('Category name contains invalid symbols');
+    return;
+  }
  
     // Duplicate check for edit, ignoring current category
     if (categories.some(
