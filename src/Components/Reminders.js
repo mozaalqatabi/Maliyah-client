@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { Check, AlertTriangle, Bell } from 'lucide-react';
-import { Badge } from 'react-bootstrap';
+import { Badge, Modal, Button } from 'react-bootstrap';
 // Local date formatter copied from utils to avoid external dependency
 const formatDateDDMMYYYY = (date) => {
   if (!date) return '';
   const dateObj = new Date(date);
   if (isNaN(dateObj.getTime())) return '';
-  const day = String(dateObj.getDate()).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0'); // Local date formatter
   const month = String(dateObj.getMonth() + 1).padStart(2, '0');
   const year = dateObj.getFullYear();
   return `${day}/${month}/${year}`;
@@ -52,7 +52,7 @@ const Reminders = () => {
   };
   const [preferences, setPreferences] = useState(getInitialPreferences());
 
-  // goalInsightsEnabled removed (not used here)
+  // goalInsightsEnabled not used here
 
   // Scheduling state
   const [schedules, setSchedules] = useState([]);
@@ -65,7 +65,7 @@ const Reminders = () => {
   const userId = user?._id;
 
 
-  // (insights removed) Reminders focuses on reminders, schedules and budget alerts
+  // Reminders focuses on reminders, schedules and budget alerts
 
   // Listen for goals changes triggered elsewhere (create/update/delete) and refresh insights/reminders
   React.useEffect(() => {
@@ -333,7 +333,7 @@ const Reminders = () => {
     });
   };
 
-  // toggleGoalInsights removed (not used in this component)
+  // toggleGoalInsights not used in this component
 
   const getIcon = (type) => {
     switch (type) {
@@ -379,6 +379,10 @@ const Reminders = () => {
   const [processingItems, setProcessingItems] = useState(new Set());
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+  // Confirmation modal state for dismiss/delete
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [pendingDeleteTitle, setPendingDeleteTitle] = useState('');
 
   // Toast notification function
   const showToastMessage = (message) => {
@@ -432,9 +436,60 @@ const Reminders = () => {
     }
   };
 
-  const dismissReminder = async (id) => {
+  // Reopen a completed reminder (mark as pending/incomplete)
+  const reopenReminder = async (id) => {
+    if (!id) return;
     setProcessingItems(prev => new Set([...prev, id]));
-    
+
+    try {
+      // Budget and schedule: just remove from completedItems set
+      if (id.startsWith('budget_') || id.startsWith('schedule_')) {
+        setCompletedItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(id);
+          return newSet;
+        });
+        showToastMessage('Reminder reopened');
+        return;
+      }
+
+      // For regular reminders, update local state and backend
+      setReminders(reminders.map(reminder =>
+        reminder._id === id ? { ...reminder, status: 'pending' } : reminder
+      ));
+
+      await fetch(`https://maliyah-server.onrender.com/reminders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'pending' })
+      });
+
+      showToastMessage('Reminder reopened');
+    } catch (err) {
+      console.error('Failed to reopen reminder:', err);
+      showToastMessage('Failed to reopen reminder. Please try again.');
+    } finally {
+      setProcessingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+    }
+  };
+
+  // Ask user to confirm before dismissing/deleting a reminder
+  const confirmDismissReminder = (id, title) => {
+    setPendingDeleteId(id);
+    setPendingDeleteTitle(title || 'this notification');
+    setShowDeleteModal(true);
+  };
+
+  // Perform the actual dismiss/delete after confirmation
+  const performDismissReminder = async (id) => {
+    if (!id) return;
+    setShowDeleteModal(false);
+    setProcessingItems(prev => new Set([...prev, id]));
+
     try {
       // Check if it's a budget alert
       if (id.startsWith('budget_')) {
@@ -442,19 +497,19 @@ const Reminders = () => {
         showToastMessage('Budget alert dismissed!');
         return;
       }
-      
+
       // Check if it's a schedule reminder
       if (id.startsWith('schedule_')) {
         setDismissedItems(prev => new Set([...prev, id]));
         showToastMessage('Schedule reminder dismissed!');
         return;
       }
-      
+
       // For regular reminders, delete from backend
       const res = await fetch(`https://maliyah-server.onrender.com/reminders/${id}`, {
         method: 'DELETE'
       });
-      
+
       if (res.ok) {
         setReminders(reminders.filter(reminder => reminder._id !== id));
         showToastMessage('Reminder dismissed successfully!');
@@ -470,6 +525,8 @@ const Reminders = () => {
         newSet.delete(id);
         return newSet;
       });
+      setPendingDeleteId(null);
+      setPendingDeleteTitle('');
     }
   };
 
@@ -1076,9 +1133,33 @@ const Reminders = () => {
                               )}
                             </button>
                           )}
+                          {reminder.status === 'completed' && (
+                            <button
+                              className="btn btn-outline-secondary btn-sm px-3 py-2"
+                              onClick={() => reopenReminder(reminder._id)}
+                              disabled={processingItems.has(reminder._id)}
+                              title="Undo"
+                              style={{
+                                transition: 'all 0.3s ease',
+                                opacity: processingItems.has(reminder._id) ? 0.7 : 1
+                              }}
+                            >
+                              {processingItems.has(reminder._id) ? (
+                                <>
+                                  <i className="fas fa-spinner fa-spin me-1"></i>
+                                  Processing...
+                                </>
+                              ) : (
+                                <>
+                                  <i className="fas fa-undo me-1"></i>
+                                  Undo
+                                </>
+                              )}
+                            </button>
+                          )}
                           <button 
                             className="btn btn-outline-danger btn-sm px-3 py-2"
-                            onClick={() => dismissReminder(reminder._id)}
+                            onClick={() => confirmDismissReminder(reminder._id, reminder.title)}
                             disabled={processingItems.has(reminder._id)}
                             title="Dismiss"
                             style={{ 
@@ -1139,6 +1220,21 @@ const Reminders = () => {
           </div>
         </div>
       )}
+      {/* Delete confirmation modal for reminders */}
+      <div>
+        <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Confirm</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <p>Delete "{pendingDeleteTitle}"? This cannot be undone.</p>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
+            <Button variant="danger" onClick={() => performDismissReminder(pendingDeleteId)}>Delete</Button>
+          </Modal.Footer>
+        </Modal>
+      </div>
       
       <style jsx>{`
         @keyframes pulse {
@@ -1197,4 +1293,3 @@ const Reminders = () => {
 };
 
 export default Reminders;
-
