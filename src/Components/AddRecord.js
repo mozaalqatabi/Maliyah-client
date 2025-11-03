@@ -419,4 +419,3 @@ const AddRecord = () => {
 };
 
 export default AddRecord;
-
