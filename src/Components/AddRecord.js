@@ -52,7 +52,7 @@ const AddRecord = () => {
     const fetchRecords = async () => {
       if (!userEmail) return;
       try {
-        const res = await axios.get(`https://maliyah-server.onrender.com/records/${userEmail}`);
+        const res = await axios.get(`http://localhost:8080/records/${userEmail}`);
         dispatch(setRecords(res.data));
       } catch (err) {
         console.error('Error fetching records:', err);
@@ -96,6 +96,11 @@ const AddRecord = () => {
     e.preventDefault();
     if (!userEmail) return setErrorMessage('You must be logged in.');
     if (!amount || !description) return setErrorMessage('Please fill in all required fields.');
+    if (parseFloat(amount) < 0) {
+      setErrorMessage('Amount cannot be negative.');
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
     if (type === 'expense' && !categoryId) return setErrorMessage('Please choose a category.');
 
     const totalIncome = records.filter((r) => r.type === 'income').reduce((sum, r) => sum + r.amount, 0);
@@ -120,11 +125,11 @@ const AddRecord = () => {
 
     try {
       if (editMode) {
-        const res = await axios.put(`https://maliyah-server.onrender.com/records/${editingRecordId}`, transaction);
+        const res = await axios.put(`http://localhost:8080/records/${editingRecordId}`, transaction);
         dispatch(updateRecord(res.data));
         setSuccessMessage('Record updated successfully!');
       } else {
-        const res = await axios.post('https://maliyah-server.onrender.com/records', transaction);
+        const res = await axios.post('http://localhost:8080/records', transaction);
         dispatch(addRecord(res.data));
         setSuccessMessage('Record added successfully!');
       }
@@ -147,14 +152,14 @@ const AddRecord = () => {
   };
 
   const confirmDelete = (id, categoryName) => {
-    if (categoryName === 'Goal Allocation') return; // prevent deleting goal allocation
+    if (categoryName === 'Goal Allocation') return;
     setDeleteConfirm({ show: true, id });
   };
 
   const handleDelete = async () => {
     if (!deleteConfirm.id) return;
     try {
-      await axios.delete(`https://maliyah-server.onrender.com/records/${deleteConfirm.id}`);
+      await axios.delete(`http://localhost:8080/records/${deleteConfirm.id}`);
       dispatch(deleteRecord(deleteConfirm.id));
       setDeleteConfirm({ show: false, id: null });
       setShowSuccess(true);
@@ -168,10 +173,10 @@ const AddRecord = () => {
   };
 
   const handleEdit = (record) => {
-    if (record.category === 'Goal Allocation') return; // prevent editing goal allocation
+    if (record.category === 'Goal Allocation') return;
     setEditRecord(record);
     setType(record.type || 'expense');
-    setAmount(record.amount ?? '');
+    setAmount(record.amount?.toString() ?? '');
     setDescription(record.description ?? '');
     setStartDate(formatForDateTimeLocal(record.startDate));
     setEditingRecordId(record._id);
@@ -255,14 +260,27 @@ const AddRecord = () => {
             <Row className="mb-3">
               <Col md={6}>
                 <Form.Label>Amount</Form.Label>
-                <Form.Control type="number" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+                <Form.Control
+                  type="text"
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                      setAmount(value);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
+                  }}
+                  required
+                />
               </Col>
               <Col md={6}>
                 <Form.Label>Date & Time</Form.Label>
                 <Form.Control
                   type="datetime-local"
                   value={startDate}
-                  max={getCurrentDateTimeForInput()}
                   onChange={(e) => setStartDate(e.target.value)}
                   required
                 />
@@ -344,16 +362,7 @@ const AddRecord = () => {
           </thead>
           <tbody>
             {[...records]
-              .sort((a, b) => {
-                const dateA = new Date(a.startDate);
-                const dateB = new Date(b.startDate);
-                if (dateA > dateB) return -1;
-                if (dateA < dateB) return 1;
-                // same date: latest inserted first using ObjectId
-                if (a._id > b._id) return -1;
-                if (a._id < b._id) return 1;
-                return 0;
-              })
+              .sort((a, b) => new Date(b.startDate) - new Date(a.startDate))
               .map((t) => {
                 const categoryName = filteredOptions.find(c => c._id === t.categoryId)?.name || t.category;
                 return (
@@ -410,4 +419,3 @@ const AddRecord = () => {
 };
 
 export default AddRecord;
-
