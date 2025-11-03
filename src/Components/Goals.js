@@ -27,7 +27,7 @@ import {
 } from 'react-bootstrap';
 import { fetchFinancialSummary } from '../Features/DashboardSlice';
 
-// Local date utilities (inlined from removed utils/dateUtils.js)
+// Local date utilities
 const formatDateDDMMYYYY = (date) => {
   if (!date) return '';
   const dateObj = new Date(date);
@@ -74,7 +74,18 @@ const Goals = () => {
       return [];
     }
     
-    return stored ? JSON.parse(stored) : [];
+    // Normalize stored dismissed insights to an array of ids (strings)
+    try {
+      const parsed = stored ? JSON.parse(stored) : [];
+      return (Array.isArray(parsed) ? parsed : []).map(item => {
+        if (!item) return '';
+        if (typeof item === 'string') return item;
+        if (typeof item === 'object') return item.id || item.text || JSON.stringify(item);
+        return String(item);
+      }).filter(Boolean);
+    } catch (e) {
+      return [];
+    }
   });
   const [insightsEnabled, setInsightsEnabled] = useState(() => {
     // Get preference from localStorage, default to true
@@ -131,15 +142,21 @@ const Goals = () => {
 
     // Fetch insights and show popup only if enabled
     if (insightsEnabled) {
-      fetch(`https://maliyah-server.onrender.com/goals/insights/${userId}`)
+      fetch(`https://maliyah-server.onrender.com0/goals/insights/${userId}`)
         .then(res => res.json())
         .then(data => {
           if (data.suggestions && data.suggestions.length > 0) {
-            // Filter out already dismissed insights
-            const newSuggestions = data.suggestions.filter(suggestion => 
-              !dismissedInsights.includes(suggestion)
-            );
-            
+            // Normalize suggestions to objects {id, text} so we can compare by id
+            const normalized = data.suggestions.map(s => {
+              if (!s) return null;
+              if (typeof s === 'string') return { id: s, text: s };
+              if (typeof s === 'object') return { id: s.id || s.text || JSON.stringify(s), text: s.text || (s.title || JSON.stringify(s)) };
+              return { id: String(s), text: String(s) };
+            }).filter(Boolean);
+
+            // Filter out already dismissed insights by id
+            const newSuggestions = normalized.filter(suggestion => !dismissedInsights.includes(suggestion.id));
+
             if (newSuggestions.length > 0) {
               // Limit to top 2 new suggestions
               const limitedSuggestions = { ...data, suggestions: newSuggestions.slice(0, 2) };
@@ -148,13 +165,13 @@ const Goals = () => {
               setTimeout(() => {
                 setShowInsightNotification(true);
                 setTimeRemaining(15);
-                
+
                 // Start countdown interval
                 const intervalId = setInterval(() => {
                   setTimeRemaining(prev => {
                     // Don't countdown if paused
                     if (isPaused) return prev;
-                    
+
                     if (prev <= 1) {
                       clearInterval(intervalId);
                       return 0;
@@ -162,16 +179,16 @@ const Goals = () => {
                     return prev - 1;
                   });
                 }, 1000);
-                
+
                 setCountdownIntervalId(intervalId);
-                
+
                 // Auto-close after 15 seconds if not manually closed
                 const timeoutId = setTimeout(() => {
                   setShowInsightNotification(false);
                   clearInterval(intervalId);
                   setCountdownIntervalId(null);
                 }, 15000);
-                
+
                 setInsightTimeoutId(timeoutId);
               }, 1000);
             }
@@ -319,6 +336,9 @@ const Goals = () => {
   const [showNewGoalModal, setShowNewGoalModal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [allocationAmount, setAllocationAmount] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [pendingDeleteGoalId, setPendingDeleteGoalId] = useState(null);
+  const [pendingDeleteGoalName, setPendingDeleteGoalName] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -338,9 +358,16 @@ const Goals = () => {
   })();
 
   const newGoalNameError = (() => {
-    const raw = String(newGoal.name || '').trim();
-    if (raw === '') return ''; // don't show until user types
-    if (/^\s*\d+\s*$/.test(raw)) return 'Goal name must include letters and cannot be only numbers';
+    const raw = String(newGoal.name || '');
+    const trimmed = raw.trim();
+    if (trimmed === '') return ''; // don't show until user types
+    if (/^\s*\d+\s*$/.test(trimmed)) return 'Goal name must include letters and cannot be only numbers';
+    // Allow only letters, numbers and spaces
+    const allowed = /^[A-Za-z0-9 ]+$/;
+    if (!allowed.test(raw)) return 'Goal name must not contain symbols (only letters, numbers and spaces)';
+    // Prevent duplicates (case-insensitive)
+    const isDuplicate = goals.some(g => typeof g.name === 'string' && g.name.trim().toLowerCase() === trimmed.toLowerCase());
+    if (isDuplicate) return 'A goal with this name already exists';
     return '';
   })();
 
@@ -356,9 +383,15 @@ const Goals = () => {
 
   const editGoalNameError = (() => {
     if (!editGoal) return '';
-    const raw = String(editGoal.name || '').trim();
-    if (raw === '') return ''; // don't show until user edits
-    if (/^\s*\d+\s*$/.test(raw)) return 'Goal name must include letters and cannot be only numbers';
+    const raw = String(editGoal.name || '');
+    const trimmed = raw.trim();
+    if (trimmed === '') return ''; // don't show until user edits
+    if (/^\s*\d+\s*$/.test(trimmed)) return 'Goal name must include letters and cannot be only numbers';
+    const allowed = /^[A-Za-z0-9 ]+$/;
+    if (!allowed.test(raw)) return 'Goal name must not contain symbols (only letters, numbers and spaces)';
+    // Prevent duplicates (case-insensitive), but ignore the goal being edited
+    const isDuplicate = goals.some(g => g._id !== editGoal._id && typeof g.name === 'string' && g.name.trim().toLowerCase() === trimmed.toLowerCase());
+    if (isDuplicate) return 'A goal with this name already exists';
     return '';
   })();
 
@@ -368,22 +401,38 @@ const Goals = () => {
       setShowEditModal(true);
     };
 
-    // Handler to delete a goal
-    const handleDeleteGoal = (goalId) => {
+    // Open confirmation modal before deleting a goal
+    const handleDeleteGoal = (goalId, goalName) => {
+      setPendingDeleteGoalId(goalId);
+      setPendingDeleteGoalName(goalName || 'this goal');
+      setShowDeleteModal(true);
+    };
+
+    // Perform deletion after user confirms
+    const performDeleteGoal = (goalId) => {
+      if (!goalId) return;
       fetch(`https://maliyah-server.onrender.com/goals/${goalId}`, {
         method: 'DELETE',
       })
         .then(res => res.json())
         .then(() => {
           setGoals(goals.filter(g => g._id !== goalId));
+          setShowDeleteModal(false);
+          setPendingDeleteGoalId(null);
+          setPendingDeleteGoalName('');
           setSuccessMessage('Goal deleted successfully!');
           setShowSuccess(true);
           setTimeout(() => setShowSuccess(false), 3000);
-            // Notify other pages and same-window listeners that goals changed
-            const ts = Date.now().toString();
-            localStorage.setItem('goalsUpdated', ts);
-            // storage events don't fire in the same window, so dispatch a custom event too
-            try { window.dispatchEvent(new CustomEvent('goalsUpdated', { detail: ts })); } catch (e) {}
+          // Notify other pages and same-window listeners that goals changed
+          const ts = Date.now().toString();
+          localStorage.setItem('goalsUpdated', ts);
+          try { window.dispatchEvent(new CustomEvent('goalsUpdated', { detail: ts })); } catch (e) {}
+        })
+        .catch(() => {
+          setShowDeleteModal(false);
+          setPendingDeleteGoalId(null);
+          setPendingDeleteGoalName('');
+          alert('Failed to delete the goal. Please try again.');
         });
     };
 
@@ -547,7 +596,7 @@ const Goals = () => {
         {insightsEnabled && insights.suggestions && insights.suggestions.length > 0 && showInsightNotification && 
           insights.suggestions.map((suggestion, idx) => (
             <Toast
-              key={idx}
+              key={suggestion.id || idx}
               onClose={() => {
                 // Clear the auto-close timeout and countdown if user manually closes
                 if (insightTimeoutId) {
@@ -561,7 +610,8 @@ const Goals = () => {
                 
                 // Mark this specific suggestion as dismissed
                 const dismissedSuggestion = insights.suggestions[idx];
-                const updatedDismissedInsights = [...dismissedInsights, dismissedSuggestion];
+                const dismissedId = dismissedSuggestion && (dismissedSuggestion.id || String(dismissedSuggestion));
+                const updatedDismissedInsights = [...dismissedInsights, dismissedId].filter(Boolean);
                 setDismissedInsights(updatedDismissedInsights);
                 
                 // Save to localStorage with timestamp
@@ -599,14 +649,57 @@ const Goals = () => {
                 e.currentTarget.style.boxShadow = '0 8px 32px rgba(139, 92, 246, 0.15)';
               }}
             >
+              { /* render a per-suggestion header: use severity/icon/title when available */ }
               <Toast.Header style={{ 
-                background: 'rgba(76, 29, 149, 0.1)', 
-                borderBottom: '1px solid rgba(76, 29, 149, 0.2)',
+                background: 'rgba(76, 29, 149, 0.06)', 
+                borderBottom: '1px solid rgba(76, 29, 149, 0.08)',
                 color: '#4c1d95',
                 borderRadius: '12px 12px 0 0'
               }}>
-                <Bell size={20} className="me-2" style={{ color: '#8b5cf6' }} />
-                <strong className="me-auto" style={{ fontSize: '1.1rem' }}>💡 Smart Insight #{idx + 1}</strong>
+                {
+                  (() => {
+                    // determine icon and title
+                    const sev = suggestion && suggestion.severity ? suggestion.severity : null;
+                    const icon = sev === 'critical' ? '⚠️' : (sev === 'warning' ? '💡' : (sev === 'info' ? '📈' : '💡'));
+                    const rawText = suggestion && (suggestion.text || String(suggestion)) || '';
+                    // Build a concise header that's different from the full body.
+                    let shortTitle = '';
+                    if (suggestion && suggestion.title) {
+                      shortTitle = suggestion.title;
+                    } else {
+                      // Patterns: overspend (You spent X% more on Food this month.)
+                      const overspendMatch = rawText.match(/spent\s+[\d\.\%]+\s+more\s+on\s+([A-Za-z ]+)\s+this month/i);
+                      if (overspendMatch && overspendMatch[1]) {
+                        shortTitle = `Overspend: ${overspendMatch[1].trim()}`;
+                      }
+                      // Low balance
+                      else if (/low balance/i.test(rawText)) {
+                        shortTitle = 'Low Balance';
+                      }
+                      // No savings
+                      else if (/no savings|no savings recorded/i.test(rawText)) {
+                        shortTitle = 'No Savings';
+                      }
+                      // New spending pattern (You spent OMR X on Food this month)
+                      else {
+                        const newSpendMatch = rawText.match(/spent\s+OMR\s*([0-9\.]+)\s+on\s+([A-Za-z ]+)\s+this month/i);
+                        if (newSpendMatch && newSpendMatch[2]) {
+                          shortTitle = `New Spend: ${newSpendMatch[2].trim()}`;
+                        } else {
+                          // Fallback: pick first 3 meaningful words
+                          const words = rawText.replace(/[^A-Za-z0-9 ]+/g, '').split(/\s+/).filter(Boolean);
+                          shortTitle = words.slice(0, 3).join(' ') + (words.length > 3 ? '...' : '');
+                        }
+                      }
+                    }
+                    return (
+                      <>
+                        <span style={{ fontSize: 18, marginRight: 8 }}>{icon}</span>
+                        <strong className="me-auto" style={{ fontSize: '1.02rem' }}>Insights</strong>
+                      </>
+                    );
+                  })()
+                }
                 <small className="opacity-75" style={{ color: '#6d28d9' }}>
                   {isPaused ? '⏸️ Paused' : `Auto-close in ${timeRemaining}s`}
                 </small>
@@ -618,7 +711,7 @@ const Goals = () => {
               }}>
                 <div className="d-flex align-items-start">
                   <div className="me-2 mt-1">✨</div>
-                  <div>{suggestion}</div>
+                  <div>{suggestion && (suggestion.text || String(suggestion))}</div>
                 </div>
               </Toast.Body>
             </Toast>
@@ -728,7 +821,7 @@ const Goals = () => {
                     <Button variant="outline-primary" size="sm" onClick={() => handleEditGoal(goal)}>
                       Edit
                     </Button>
-                    <Button variant="outline-danger" size="sm" onClick={() => handleDeleteGoal(goal._id)}>
+                    <Button variant="outline-danger" size="sm" onClick={() => handleDeleteGoal(goal._id, goal.name)}>
                       Delete
                     </Button>
                   </div>
@@ -817,7 +910,11 @@ const Goals = () => {
                 <Form.Control
                   type="text"
                   value={editGoal.name}
-                  onChange={e => setEditGoal({ ...editGoal, name: e.target.value })}
+                  onChange={e => {
+                    // Strip any symbols as user types (allow only letters, numbers and spaces)
+                    const cleaned = e.target.value.replace(/[^A-Za-z0-9 ]+/g, '');
+                    setEditGoal({ ...editGoal, name: cleaned });
+                  }}
                   required
                 />
                 {editGoalNameError && (
@@ -869,7 +966,7 @@ const Goals = () => {
                 <Button variant="secondary" onClick={() => setShowEditModal(false)} className="me-2">
                   Cancel
                 </Button>
-                <Button type="submit" variant="primary" disabled={Boolean(editGoalError)}>
+                <Button type="submit" variant="primary" disabled={Boolean(editGoalError) || Boolean(editGoalNameError)}>
                   Save Changes
                 </Button>
               </div>
@@ -889,7 +986,11 @@ const Goals = () => {
                 type="text"
                 placeholder="e.g., New Car"
                 value={newGoal.name}
-                onChange={(e) => setNewGoal({ ...newGoal, name: e.target.value })}
+                onChange={(e) => {
+                  // Strip symbols as user types (allow only letters, numbers and spaces)
+                  const cleaned = e.target.value.replace(/[^A-Za-z0-9 ]+/g, '');
+                  setNewGoal({ ...newGoal, name: cleaned });
+                }}
                 required
               />
               {newGoalNameError && (
@@ -946,7 +1047,7 @@ const Goals = () => {
               <Button variant="secondary" onClick={() => setShowNewGoalModal(false)} className="me-2">
                 Cancel
               </Button>
-              <Button type="submit" variant="success" disabled={Boolean(newGoalError) || !newGoal.name || !newGoal.deadline || !newGoal.category}>
+              <Button type="submit" variant="success" disabled={Boolean(newGoalError) || Boolean(newGoalNameError) || !newGoal.name || !newGoal.deadline || !newGoal.category}>
                 <Plus size={16} className="me-2" />
                 Create Goal
               </Button>
@@ -954,9 +1055,21 @@ const Goals = () => {
           </Form>
         </Modal.Body>
       </Modal>
+      {/* Delete confirmation modal */}
+      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Delete</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Delete "{pendingDeleteGoalName}"? This cannot be undone.</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
+          <Button variant="danger" onClick={() => performDeleteGoal(pendingDeleteGoalId)}>Delete Goal</Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };
 
 export default Goals;
-
