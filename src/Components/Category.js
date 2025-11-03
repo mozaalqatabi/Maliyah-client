@@ -30,42 +30,66 @@ const Categories = () => {
   }, [userEmail]);
 
   const handleAddCategory = async () => {
-    const trimmedName = newCategory.name.trim();
+  const trimmedName = newCategory.name.trim();
 
-    if (!trimmedName) {
-      setErrorMessage("Category name is required");
-      return;
-    }
+  // Validation: required field
+  if (!trimmedName) {
+    setErrorMessage("Category name is required");
+    return;
+  }
 
-    // Check for duplicate name (case-insensitive) with same type
-    const duplicate = categories.some(
-      cat =>
-        cat.name.toLowerCase() === trimmedName.toLowerCase() &&
-        cat.type.toLowerCase() === newCategory.type.toLowerCase()
-    );
-
-    if (duplicate) {
-      setErrorMessage("Category with the same name and type already exists");
-      return;
-    }
-
-    try {
-      const res = await axios.post('https://maliyah-server.onrender.com/categories', {
-        name: trimmedName,
-        type: newCategory.type,
-        userEmail
-      });
-      setCategories([res.data, ...categories]);
-      setNewCategory({ name: '', type: 'expense' });
-      setShowModal(false);
-      setSuccessMessage('Category created successfully!');
-      setTimeout(() => setSuccessMessage(''), 3000);
-      setErrorMessage('');
-    } catch (err) {
-      console.error(err);
-      setErrorMessage(err.response?.data?.message || "Failed to create category");
-    }
+  // Validation: only valid names allowed
+  const isValidCategoryName = (name) => {
+    // Must have at least 2 valid characters (letters/numbers)
+    // Allows spaces or one allowed symbol between words (with optional spaces around)
+    const regex = /^(?=.{2,}$)[A-Za-z0-9]+(?:\s?[-\/&.,_]\s?[A-Za-z0-9]+|\s+[A-Za-z0-9]+)*$/;
+    return regex.test(name.trim());
   };
+
+  if (!isValidCategoryName(trimmedName)) {
+    setErrorMessage(
+      "Invalid category name"
+    );
+    return;
+  }
+
+  // Validation: disallow only-number names
+  if (/^[0-9]+$/.test(trimmedName)) {
+    setErrorMessage("Category name cannot be only numbers");
+    return;
+  }
+
+  // Check for duplicate name (case-insensitive) with same type
+  const duplicate = categories.some(
+    (cat) =>
+      cat.name.toLowerCase() === trimmedName.toLowerCase() &&
+      cat.type.toLowerCase() === newCategory.type.toLowerCase()
+  );
+
+  if (duplicate) {
+    setErrorMessage("Category with the same name and type already exists");
+    return;
+  }
+
+  // If all validations pass, proceed to save
+  try {
+    const res = await axios.post("https://maliyah-server.onrender.com/categories", {
+      name: trimmedName,
+      type: newCategory.type,
+      userEmail,
+    });
+    setCategories([res.data, ...categories]);
+    setNewCategory({ name: "", type: "expense" });
+    setShowModal(false);
+    setSuccessMessage("Category created successfully!");
+    setTimeout(() => setSuccessMessage(""), 3000);
+    setErrorMessage("");
+  } catch (err) {
+    console.error(err);
+    setErrorMessage(err.response?.data?.message || "Failed to create category");
+  }
+};
+
 
   const handleDelete = async (id) => {
     try {
@@ -191,4 +215,3 @@ const Categories = () => {
 };
 
 export default Categories;
-
