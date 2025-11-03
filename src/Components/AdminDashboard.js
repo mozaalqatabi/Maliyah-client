@@ -1,4 +1,4 @@
-//AdminDashboard.js
+// AdminDashboard.js
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
@@ -30,6 +30,14 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const adminEmail = "maliyahmlk@gmail.com";
+ 
+  // ✅ Regex validator for category names
+  const isValidCategoryName = (name) => {
+    // Allows letters, numbers, spaces, and these symbols: / & , . - _
+    // Disallows other special symbols like ^%$#@!~`() etc.
+    const regex = /^[a-zA-Z0-9\s\/&.,_-]+$/;
+    return regex.test(name.trim());
+  };
  
   // Fetch users
   useEffect(() => {
@@ -87,24 +95,31 @@ const AdminDashboard = () => {
     );
   };
  
-  // Create new category
+  // ✅ Create new category
   const handleCreateCategory = async (e) => {
     e.preventDefault();
     setNewErrorMessage('');
  
-    if (!newCategory.name) {
+    const trimmedName = newCategory.name.trim();
+ 
+    if (!trimmedName) {
       setNewErrorMessage('Category name is required');
       return;
     }
+
+    if (!isValidCategoryName(trimmedName)) {
+      setNewErrorMessage('Category name contains invalid symbols');
+      return;
+    }
  
-    if (isDuplicateCategory(newCategory.name, newCategory.type)) {
+    if (isDuplicateCategory(trimmedName, newCategory.type)) {
       setNewErrorMessage('Category already exists');
       return;
     }
  
     try {
       const res = await axios.post('https://maliyah-server.onrender.com/categories', {
-        name: newCategory.name,
+        name: trimmedName,
         type: newCategory.type,
         description: newCategory.description,
         userEmail: null
@@ -127,13 +142,20 @@ const AdminDashboard = () => {
     setShowEditCategoryModal(true);
   };
  
-  // Update category
+  // ✅ Update category
   const handleUpdateCategory = async (e) => {
     e.preventDefault();
     setEditErrorMessage('');
  
-    if (!editCategory.name) {
+    const trimmedName = editCategory.name.trim();
+ 
+    if (!trimmedName) {
       setEditErrorMessage('Category name is required');
+      return;
+    }
+
+    if (!isValidCategoryName(trimmedName)) {
+      setEditErrorMessage('Category name contains invalid symbols');
       return;
     }
  
@@ -141,7 +163,7 @@ const AdminDashboard = () => {
     if (categories.some(
       cat => cat._id !== editCategory._id &&
         cat.type.toLowerCase() === editCategory.type.toLowerCase() &&
-        cat.name.toLowerCase() === editCategory.name.toLowerCase()
+        cat.name.toLowerCase() === trimmedName.toLowerCase()
     )) {
       setEditErrorMessage('Category with the same name and type already exists');
       return;
@@ -149,7 +171,7 @@ const AdminDashboard = () => {
  
     try {
       const res = await axios.put(`https://maliyah-server.onrender.com/categories/${editCategory._id}`, {
-        name: editCategory.name,
+        name: trimmedName,
         type: editCategory.type,
         description: editCategory.description
       });
@@ -238,7 +260,7 @@ const AdminDashboard = () => {
           {activeTab === 'users' && (
             <Table responsive hover className="mb-0">
               <thead className="table-light text-secondary text-uppercase small">
-                <tr><th>Name</th><th>Email</th><th>Created At</th></tr>
+                <tr><th>Name</th><th>Email</th></tr>
               </thead>
               <tbody>
                 {loading ? <tr><td colSpan="3" className="text-center py-3 text-muted">Loading...</td></tr>
@@ -311,19 +333,33 @@ const AdminDashboard = () => {
           <Modal.Body>
             <Form.Group className="mb-3">
               <Form.Label>Name</Form.Label>
-              <Form.Control type="text" placeholder="Enter category name" value={newCategory.name} onChange={e => setNewCategory({ ...newCategory, name: e.target.value })} />
+              <Form.Control
+                type="text"
+                placeholder="Enter category name"
+                value={newCategory.name}
+                onChange={e => setNewCategory({ ...newCategory, name: e.target.value })}
+              />
               {newErrorMessage && <Form.Text className="text-danger">{newErrorMessage}</Form.Text>}
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Type</Form.Label>
-              <Form.Select value={newCategory.type} onChange={e => setNewCategory({ ...newCategory, type: e.target.value })}>
+              <Form.Select
+                value={newCategory.type}
+                onChange={e => setNewCategory({ ...newCategory, type: e.target.value })}
+              >
                 <option value="Expense">Expense</option>
                 <option value="Income">Income</option>
               </Form.Select>
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Description</Form.Label>
-              <Form.Control as="textarea" rows={3} placeholder="Category description" value={newCategory.description} onChange={e => setNewCategory({ ...newCategory, description: e.target.value })} />
+              <Form.Control
+                as="textarea"
+                rows={3}
+                placeholder="Category description"
+                value={newCategory.description}
+                onChange={e => setNewCategory({ ...newCategory, description: e.target.value })}
+              />
             </Form.Group>
           </Modal.Body>
           <Modal.Footer>
@@ -340,19 +376,31 @@ const AdminDashboard = () => {
           <Modal.Body>
             <Form.Group className="mb-3">
               <Form.Label>Name</Form.Label>
-              <Form.Control type="text" value={editCategory?.name || ''} onChange={e => setEditCategory({ ...editCategory, name: e.target.value })} />
+              <Form.Control
+                type="text"
+                value={editCategory?.name || ''}
+                onChange={e => setEditCategory({ ...editCategory, name: e.target.value })}
+              />
               {editErrorMessage && <Form.Text className="text-danger">{editErrorMessage}</Form.Text>}
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Type</Form.Label>
-              <Form.Select value={editCategory?.type || 'Expense'} onChange={e => setEditCategory({ ...editCategory, type: e.target.value })}>
+              <Form.Select
+                value={editCategory?.type || 'Expense'}
+                onChange={e => setEditCategory({ ...editCategory, type: e.target.value })}
+              >
                 <option value="Expense">Expense</option>
                 <option value="Income">Income</option>
               </Form.Select>
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Description</Form.Label>
-              <Form.Control as="textarea" rows={3} value={editCategory?.description || ''} onChange={e => setEditCategory({ ...editCategory, description: e.target.value })} />
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={editCategory?.description || ''}
+                onChange={e => setEditCategory({ ...editCategory, description: e.target.value })}
+              />
             </Form.Group>
           </Modal.Body>
           <Modal.Footer>
@@ -366,6 +414,3 @@ const AdminDashboard = () => {
 };
  
 export default AdminDashboard;
- 
- 
-
